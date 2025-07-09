@@ -1,0 +1,85 @@
+-- 📌 Script 2: Wait & Steal khi base mở
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Workspace = game:GetService("Workspace")
+local Map = Workspace:WaitForChild("Map")
+local TycoonsFolder = Map:WaitForChild("Tycoons")
+
+local model = getgenv()._modelMap and getgenv()._modelMap[getgenv()._selectedModelName]
+if not model then
+	warn("❌ Không tìm thấy model hoặc chưa chọn.")
+	return
+end
+
+local function getTycoonOwnerName(tycoon)
+	local usernamePath = tycoon:FindFirstChild("Tycoon") 
+		and tycoon.Tycoon:FindFirstChild("Board") 
+		and tycoon.Tycoon.Board:FindFirstChild("Board") 
+		and tycoon.Tycoon.Board.Board:FindFirstChild("SurfaceGui") 
+		and tycoon.Tycoon.Board.Board.SurfaceGui:FindFirstChild("Username")
+
+	if usernamePath and usernamePath:IsA("TextLabel") then
+		return usernamePath.Text
+	end
+	return nil
+end
+
+local function getTimeLabel(tycoon)
+	local folder = tycoon.Tycoon:FindFirstChild("ForcefieldFolder")
+	if folder then
+		for _, part in ipairs(folder:GetChildren()) do
+			local gui = part:FindFirstChild("Screen") and part.Screen:FindFirstChild("SurfaceGui")
+			if gui and gui:FindFirstChild("Time") and gui.Time:IsA("TextLabel") then
+				return gui.Time
+			end
+		end
+	end
+	return nil
+end
+
+local function findModelTycoon(modelToFind)
+	for i = 1, 8 do
+		local tycoon = TycoonsFolder:FindFirstChild("Tycoon" .. i)
+		if tycoon and tycoon:FindFirstChild("Temporary") then
+			for _, m in ipairs(tycoon.Temporary:GetChildren()) do
+				if m == modelToFind then
+					return tycoon
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local tycoon = findModelTycoon(model)
+if not tycoon then
+	warn("❌ Không tìm thấy base chứa NPC.")
+	return
+end
+
+local timeLabel = getTimeLabel(tycoon)
+if not timeLabel then
+	warn("❌ Không tìm thấy Time label trong base.")
+	return
+end
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		local raw = tostring(timeLabel.Text):match("%d+") or "999"
+		local number = tonumber(raw)
+		if number and number <= 0 then
+			local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+			if part then
+				HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 5, 0)
+				warn("💰 Base mở! Đã TP tới NPC:", getgenv()._selectedModelName)
+			else
+				warn("⚠️ Không tìm thấy part để TP.")
+			end
+			break
+		end
+	end
+end)
