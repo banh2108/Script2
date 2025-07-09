@@ -1,5 +1,3 @@
--- 📌 Script 2: Chờ base mở và TP tới NPC đã chọn
-
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
@@ -8,18 +6,16 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Map = Workspace:WaitForChild("Map")
 local TycoonsFolder = Map:WaitForChild("Tycoons")
 
--- Tìm model hiện tại từ tên (vì model cũ có thể bị respawn)
 local function findModelByName(displayName)
 	for i = 1, 8 do
 		local tycoon = TycoonsFolder:FindFirstChild("Tycoon" .. i)
 		if tycoon and tycoon:FindFirstChild("Temporary") then
 			for _, model in ipairs(tycoon.Temporary:GetChildren()) do
 				if model:IsA("Model") then
-					local owner = tycoon:FindFirstChild("Tycoon") and tycoon.Tycoon:FindFirstChild("Board")
-					local usernameLabel = owner and owner.Board and owner.Board:FindFirstChild("SurfaceGui") and owner.Board.SurfaceGui:FindFirstChild("Username")
-					local ownerName = usernameLabel and usernameLabel:IsA("TextLabel") and usernameLabel.Text
-					local composed = ownerName and (ownerName .. " - " .. model.Name)
-					if composed == displayName then
+					local board = tycoon:FindFirstChild("Tycoon") and tycoon.Tycoon:FindFirstChild("Board")
+					local label = board and board.Board and board.Board:FindFirstChild("SurfaceGui") and board.Board.SurfaceGui:FindFirstChild("Username")
+					local ownerName = label and label:IsA("TextLabel") and label.Text
+					if ownerName and (ownerName .. " - " .. model.Name) == displayName then
 						return model, tycoon
 					end
 				end
@@ -29,7 +25,6 @@ local function findModelByName(displayName)
 	return nil, nil
 end
 
--- Tìm TextLabel Time
 local function getTimeLabel(tycoon)
 	local folder = tycoon.Tycoon:FindFirstChild("ForcefieldFolder")
 	if folder then
@@ -43,57 +38,53 @@ local function getTimeLabel(tycoon)
 	return nil
 end
 
+local function getTeleportPart(model)
+	if model.PrimaryPart then return model.PrimaryPart end
+	for _, obj in ipairs(model:GetDescendants()) do
+		if obj:IsA("BasePart") then
+			return obj
+		end
+	end
+	return nil
+end
+
+-- 🚀 Start process
 local displayName = getgenv()._selectedModelName
 if not displayName then
-	warn("⚠️ Không có NPC nào đang được theo dõi.")
+	warn("⚠️ Không có NPC nào được chọn.")
 	return
 end
 
--- Tìm model và tycoon chứa model
+print("▶️ Đang theo dõi NPC:", displayName)
+
 local model, tycoon = findModelByName(displayName)
 if not model or not tycoon then
-	warn("❌ Không tìm thấy NPC hoặc base chứa NPC:", displayName)
+	warn("❌ Không tìm thấy NPC hoặc base.")
 	return
 end
 
 local timeLabel = getTimeLabel(tycoon)
 if not timeLabel then
-	warn("❌ Không tìm thấy đồng hồ Forcefield.")
+	warn("❌ Không tìm thấy đồng hồ base.")
 	return
 end
 
--- Theo dõi thời gian
 task.spawn(function()
 	while true do
 		task.wait(1)
-
-		-- Mỗi lần kiểm tra lại model (phòng trường hợp bị respawn)
 		model, tycoon = findModelByName(displayName)
-		if not model then
-			warn("❌ Model đã bị xoá hoặc không tồn tại.")
-			break
-		end
+		timeLabel = getTimeLabel(tycoon)
 
-		local raw = tostring(timeLabel.Text):match("%d+") or "999"
-		local number = tonumber(raw)
+		local timeText = timeLabel and timeLabel.Text
+		local num = tonumber(timeText and timeText:match("%d+")) or 999
 
-		if number and number <= 0 then
-			local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
-			if not part then
-				-- Nếu model không có PrimaryPart, gán thủ công
-				for _, obj in ipairs(model:GetDescendants()) do
-					if obj:IsA("BasePart") then
-						part = obj
-						break
-					end
-				end
-			end
-
-			if part then
-				HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 5, 0)
-				warn("💥 Base mở! Đã TP tới NPC:", displayName)
+		if num <= 0 then
+			local tpPart = getTeleportPart(model)
+			if tpPart then
+				HumanoidRootPart.CFrame = tpPart.CFrame + Vector3.new(0, 5, 0)
+				print("✅ TP tới NPC:", displayName)
 			else
-				warn("❌ Không tìm thấy vị trí trong NPC để TP.")
+				warn("❌ Không tìm thấy vị trí TP.")
 			end
 			break
 		end
