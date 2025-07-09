@@ -1,32 +1,35 @@
--- 📌 Script 2: Wait & Steal khi base mở
+-- 📌 Script 2: Chờ base mở và TP tới NPC đã chọn
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local Workspace = game:GetService("Workspace")
 local Map = Workspace:WaitForChild("Map")
 local TycoonsFolder = Map:WaitForChild("Tycoons")
 
-local model = getgenv()._modelMap and getgenv()._modelMap[getgenv()._selectedModelName]
-if not model then
-	warn("❌ Không tìm thấy model hoặc chưa chọn.")
-	return
-end
-
-local function getTycoonOwnerName(tycoon)
-	local usernamePath = tycoon:FindFirstChild("Tycoon") 
-		and tycoon.Tycoon:FindFirstChild("Board") 
-		and tycoon.Tycoon.Board:FindFirstChild("Board") 
-		and tycoon.Tycoon.Board.Board:FindFirstChild("SurfaceGui") 
-		and tycoon.Tycoon.Board.Board.SurfaceGui:FindFirstChild("Username")
-
-	if usernamePath and usernamePath:IsA("TextLabel") then
-		return usernamePath.Text
+-- Tìm model hiện tại từ tên (vì model cũ có thể bị respawn)
+local function findModelByName(displayName)
+	for i = 1, 8 do
+		local tycoon = TycoonsFolder:FindFirstChild("Tycoon" .. i)
+		if tycoon and tycoon:FindFirstChild("Temporary") then
+			for _, model in ipairs(tycoon.Temporary:GetChildren()) do
+				if model:IsA("Model") then
+					local owner = tycoon:FindFirstChild("Tycoon") and tycoon.Tycoon:FindFirstChild("Board")
+					local usernameLabel = owner and owner.Board and owner.Board:FindFirstChild("SurfaceGui") and owner.Board.SurfaceGui:FindFirstChild("Username")
+					local ownerName = usernameLabel and usernameLabel:IsA("TextLabel") and usernameLabel.Text
+					local composed = ownerName and (ownerName .. " - " .. model.Name)
+					if composed == displayName then
+						return model, tycoon
+					end
+				end
+			end
+		end
 	end
-	return nil
+	return nil, nil
 end
 
+-- Tìm TextLabel Time
 local function getTimeLabel(tycoon)
 	local folder = tycoon.Tycoon:FindFirstChild("ForcefieldFolder")
 	if folder then
@@ -40,44 +43,57 @@ local function getTimeLabel(tycoon)
 	return nil
 end
 
-local function findModelTycoon(modelToFind)
-	for i = 1, 8 do
-		local tycoon = TycoonsFolder:FindFirstChild("Tycoon" .. i)
-		if tycoon and tycoon:FindFirstChild("Temporary") then
-			for _, m in ipairs(tycoon.Temporary:GetChildren()) do
-				if m == modelToFind then
-					return tycoon
-				end
-			end
-		end
-	end
-	return nil
+local displayName = getgenv()._selectedModelName
+if not displayName then
+	warn("⚠️ Không có NPC nào đang được theo dõi.")
+	return
 end
 
-local tycoon = findModelTycoon(model)
-if not tycoon then
-	warn("❌ Không tìm thấy base chứa NPC.")
+-- Tìm model và tycoon chứa model
+local model, tycoon = findModelByName(displayName)
+if not model or not tycoon then
+	warn("❌ Không tìm thấy NPC hoặc base chứa NPC:", displayName)
 	return
 end
 
 local timeLabel = getTimeLabel(tycoon)
 if not timeLabel then
-	warn("❌ Không tìm thấy Time label trong base.")
+	warn("❌ Không tìm thấy đồng hồ Forcefield.")
 	return
 end
 
+-- Theo dõi thời gian
 task.spawn(function()
 	while true do
 		task.wait(1)
+
+		-- Mỗi lần kiểm tra lại model (phòng trường hợp bị respawn)
+		model, tycoon = findModelByName(displayName)
+		if not model then
+			warn("❌ Model đã bị xoá hoặc không tồn tại.")
+			break
+		end
+
 		local raw = tostring(timeLabel.Text):match("%d+") or "999"
 		local number = tonumber(raw)
+
 		if number and number <= 0 then
 			local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+			if not part then
+				-- Nếu model không có PrimaryPart, gán thủ công
+				for _, obj in ipairs(model:GetDescendants()) do
+					if obj:IsA("BasePart") then
+						part = obj
+						break
+					end
+				end
+			end
+
 			if part then
 				HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 5, 0)
-				warn("💰 Base mở! Đã TP tới NPC:", getgenv()._selectedModelName)
+				warn("💥 Base mở! Đã TP tới NPC:", displayName)
 			else
-				warn("⚠️ Không tìm thấy part để TP.")
+				warn("❌ Không tìm thấy vị trí trong NPC để TP.")
 			end
 			break
 		end
