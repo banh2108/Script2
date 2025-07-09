@@ -1,3 +1,4 @@
+-- 📌 Script 2: Theo dõi base đã chọn, TP khi time về 0
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
@@ -6,6 +7,7 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Map = Workspace:WaitForChild("Map")
 local TycoonsFolder = Map:WaitForChild("Tycoons")
 
+-- 🔍 Tìm model đang chọn
 local function findModelByName(displayName)
 	for i = 1, 8 do
 		local tycoon = TycoonsFolder:FindFirstChild("Tycoon" .. i)
@@ -25,19 +27,21 @@ local function findModelByName(displayName)
 	return nil, nil
 end
 
+-- 🔍 Tìm time label đúng path mới
 local function getTimeLabel(tycoon)
-	local folder = tycoon.Tycoon:FindFirstChild("ForcefieldFolder")
-	if folder then
-		for _, part in ipairs(folder:GetChildren()) do
-			local gui = part:FindFirstChild("Screen") and part.Screen:FindFirstChild("SurfaceGui")
-			if gui and gui:FindFirstChild("Time") and gui.Time:IsA("TextLabel") then
-				return gui.Time
-			end
-		end
+	local screen1 = tycoon:FindFirstChild("Tycoon"):FindFirstChild("ForcefieldFolder"):FindFirstChild("Screen")
+	if not screen1 then return nil end
+
+	local screen2 = screen1:FindFirstChild("Screen")
+	local gui = screen2 and screen2:FindFirstChild("SurfaceGui")
+	local timeLabel = gui and gui:FindFirstChild("Time")
+	if timeLabel and timeLabel:IsA("TextLabel") then
+		return timeLabel
 	end
 	return nil
 end
 
+-- 🔍 Tìm part trong model để TP
 local function getTeleportPart(model)
 	if model.PrimaryPart then return model.PrimaryPart end
 	for _, obj in ipairs(model:GetDescendants()) do
@@ -48,7 +52,7 @@ local function getTeleportPart(model)
 	return nil
 end
 
--- 🚀 Start process
+-- ▶️ Bắt đầu theo dõi
 local displayName = getgenv()._selectedModelName
 if not displayName then
 	warn("⚠️ Không có NPC nào được chọn.")
@@ -69,20 +73,24 @@ if not timeLabel then
 	return
 end
 
+-- 🕒 Đợi base mở
 task.spawn(function()
 	while true do
 		task.wait(1)
+
 		model, tycoon = findModelByName(displayName)
 		timeLabel = getTimeLabel(tycoon)
 
-		local timeText = timeLabel and timeLabel.Text
-		local num = tonumber(timeText and timeText:match("%d+")) or 999
+		local text = timeLabel and timeLabel.Text or ""
+		local number = tonumber(text:gsub("%D", "")) or 999
 
-		if num <= 0 then
+		print("[⏳] Time hiện tại:", text, "→", number)
+
+		if number == 0 then
 			local tpPart = getTeleportPart(model)
 			if tpPart then
 				HumanoidRootPart.CFrame = tpPart.CFrame + Vector3.new(0, 5, 0)
-				print("✅ TP tới NPC:", displayName)
+				print("✅ Base mở! Đã TP tới:", displayName)
 			else
 				warn("❌ Không tìm thấy vị trí TP.")
 			end
